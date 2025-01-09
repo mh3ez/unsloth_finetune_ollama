@@ -93,3 +93,99 @@ dataset = to_sharegpt(
 # Standardize the ShareGPT dataset
 dataset = standardize_sharegpt(dataset)
 ```
+
+<h3><b>STEP 4 - Customizable Chat Templates</b> 💬 </h3>
+<p>The issue is the Alpaca format has 3 fields, whilst OpenAI style chatbots must only use 2 fields (instruction and response). That's why we used the <b>to_sharegpt</b> function to merge these columns into 1.</p>
+
+```python
+chat_template = """Below are some instructions that describe some tasks. Write responses that appropriately complete each request.
+
+### Instruction:
+{INPUT}
+
+### Response:
+{OUTPUT}"""
+
+from unsloth import apply_chat_template
+dataset = apply_chat_template(
+    dataset,
+    tokenizer = tokenizer,
+    chat_template = chat_template,
+    # default_system_message = "You are a helpful assistant", << [OPTIONAL]
+)
+```
+
+<h3><b>STEP 5 - Train the model</b> 🦾</h3>
+<p>Now let's use Huggingface TRL's <b>SFTTrainer!</b> More docs here: <a href="https://huggingface.co/docs/trl/sft_trainer">TRL SFT docs</a>. We do 60 steps to speed things up, but you can set <b>num_train_epochs=1</b> for a full run, and turn off <b>max_steps=None</b>. We also support TRL's <b>DPOTrainer</b>!</p>
+
+```python
+from trl import SFTTrainer
+from transformers import TrainingArguments
+from unsloth import is_bfloat16_supported
+trainer = SFTTrainer(
+    model = model,
+    tokenizer = tokenizer,
+    train_dataset = dataset,
+    dataset_text_field = "text",
+    max_seq_length = max_seq_length,
+    dataset_num_proc = 2,
+    packing = False, # Can make training 5x faster for short sequences.
+    args = TrainingArguments(
+        per_device_train_batch_size = 2,
+        gradient_accumulation_steps = 4,
+        warmup_steps = 5,
+        max_steps = 60,
+        # num_train_epochs = 1, # For longer training runs!
+        learning_rate = 2e-4,
+        fp16 = not is_bfloat16_supported(),
+        bf16 = is_bfloat16_supported(),
+        logging_steps = 1,
+        optim = "adamw_8bit",
+        weight_decay = 0.01,
+        lr_scheduler_type = "linear",
+        seed = 3407,
+        output_dir = "outputs",
+        report_to = "none", # Use this for WandB etc
+    ),
+)
+```
+
+```python
+trainer_stats = trainer.train()
+```
+
+<p>Let's run the model! Unsloth makes inference natively 2x faster as well! You should use prompts which are similar to the ones you had finetuned on, otherwise you might get bad results!</p>
+
+```python
+FastLanguageModel.for_inference(model) # Enable native 2x faster inference
+messages = [                    # Change below!
+    {"role": "user", "content": "Continue the fibonacci sequence! Your input is 1, 1, 2, 3, 5, 8,"},
+]
+input_ids = tokenizer.apply_chat_template(
+    messages,
+    add_generation_prompt = True,
+    return_tensors = "pt",
+).to("cuda")
+
+from transformers import TextStreamer
+text_streamer = TextStreamer(tokenizer, skip_prompt = True)
+_ = model.generate(input_ids, streamer = text_streamer, max_new_tokens = 128, pad_token_id = tokenizer.eos_token_id)
+```
+
+<h3><b>STEP 6 - Saving, loading finetuned models</b> 💬 </h3>
+<p>To save the final model as LoRA adapters, either use Huggingface's push_to_hub for an online save or save_pretrained for a local save.</p>
+<p><b>[NOTE]</b> This ONLY saves the LoRA adapters, and not the full model. To save to 16bit or GGUF, scroll down!</p>
+
+```python
+# model.save_pretrained("lora_model") # Local saving
+# tokenizer.save_pretrained("lora_model")
+model.push_to_hub("your_name/lora_model", token = "...") # Online saving
+tokenizer.push_to_hub("your_name/lora_model", token = "...") # Online saving
+```
+
+<p>push model to Huggingface</p>
+
+```python
+model.push_to_hub_gguf("<hungingface_folder>", tokenizer, quantization_method = "q8_0", token = "...")
+# quantization_method >> q4_k_m q8_0
+```
