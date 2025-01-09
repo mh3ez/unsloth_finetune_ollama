@@ -189,3 +189,55 @@ tokenizer.push_to_hub("your_name/lora_model", token = "...") # Online saving
 model.push_to_hub_gguf("<hungingface_folder>", tokenizer, quantization_method = "q8_0", token = "...")
 # quantization_method >> q4_k_m q8_0
 ```
+
+<p>If you don't need to push your model to huggingface you can stop process after finished <b>"Unsloth: Save ollama Modelfile to ..."</b></p>
+
+![image](https://github.com/user-attachments/assets/38f70af1-332b-4255-b164-776ee8790c9f)
+
+<h3><b>STEP 7 - .GGUF to Ollama models</b> 🦙 </h3>
+<p><b>If you push models to Huggingface</b>, Read more information <a href="https://huggingface.co/docs/hub/en/ollama">Use Ollama with any GGUF Model on Hugging Face Hub</a></p>
+<p>For example:</p>
+
+```bash
+ollama run hf.co/bartowski/Llama-3.2-3B-Instruct-GGUF:IQ3_M
+ollama run hf.co/bartowski/Llama-3.2-3B-Instruct-GGUF:Q8_0
+
+# the quantization name is case-insensitive, this will also work
+ollama run hf.co/bartowski/Llama-3.2-3B-Instruct-GGUF:iq3_m
+
+# you can also directly use the full filename as a tag
+ollama run hf.co/bartowski/Llama-3.2-3B-Instruct-GGUF:Llama-3.2-3B-Instruct-IQ3_M.gguf
+```
+
+<p><b>If you save models on local</b>, follow the steps below:</p>
+
+<p>1. Go to your model directory and check your files.</p>
+
+![image](https://github.com/user-attachments/assets/cefc97f1-2caa-47bd-b811-95e469da6c93)
+
+
+<p>2. If you use the Ollama Docker, you must first access the Docker container using the command:  </p>
+
+```bash
+sudo docker ps -a
+sudo docker exec -it ollama bash
+```
+
+<p>Create model, using the command:</p>
+
+```bash
+ollama create your_model_name --file /your_path/Modelfile
+# example : ollama create lora_model --file /home/mh3ez/lora_model/Modelfile
+```
+
+<p><b>Note:</b> If you are unable to access your model folder, you may need to copy or mount it into this container first.</p>
+
+<p>3. Verify and Test run model</p>
+
+```bash
+# List all model
+ollama list
+
+# Test run your model
+ollama run lora_model
+```
