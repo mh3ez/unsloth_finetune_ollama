@@ -1,1 +1,1 @@
-# finetune_ollama
+# GGUF to Ollama
